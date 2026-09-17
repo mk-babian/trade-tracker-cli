@@ -1,3 +1,6 @@
+### [WARNING]
+I vibe coded this
+
 # Trade Tracker CLI
 
 A modular, single-binary C++23 command-line day-trading journal that tracks
