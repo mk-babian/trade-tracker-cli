@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/saba/trade-tracker-cli/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
