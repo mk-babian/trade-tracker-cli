@@ -1,5 +1,5 @@
 ### [WARNING]
-I vibe coded this
+I vibe coded this entirely.
 
 # Trade Tracker CLI
 
