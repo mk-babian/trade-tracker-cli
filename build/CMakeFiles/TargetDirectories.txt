@@ -1,3 +1,0 @@
-C:/Users/saba/trade-tracker-cli/build/CMakeFiles/trade-tracker.dir
-C:/Users/saba/trade-tracker-cli/build/CMakeFiles/edit_cache.dir
-C:/Users/saba/trade-tracker-cli/build/CMakeFiles/rebuild_cache.dir
