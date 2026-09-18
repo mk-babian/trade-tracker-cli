@@ -22,30 +22,6 @@ namespace tt::cli {
 
 namespace {
 
-bool cmd_journal(const std::vector<std::string_view>& args, const std::filesystem::path& path) {
-    std::string text;
-    if (!args.empty()) {
-        for (std::size_t i = 0; i < args.size(); ++i) {
-            if (i) text.push_back(' ');
-            text += args[i];
-        }
-    } else {
-        auto raw = prompt("Entry:");
-        if (!raw.has_value() || raw->empty()) {
-            std::println(stderr, "{}aborted (empty entry){}", ansi::bright_yellow, ansi::reset);
-            return false;
-        }
-        text = *raw;
-    }
-    std::string err;
-    if (!append_journal_entry(path, text, err)) {
-        std::println(stderr, "{}error: {}{}", ansi::bright_red, err, ansi::reset);
-        return false;
-    }
-    std::println("{}logged to {}{}", ansi::green, path.string(), ansi::reset);
-    return true;
-}
-
 std::filesystem::path default_data_file() {
     if (const char* env = std::getenv("TT_DATA_FILE"); env != nullptr && *env != '\0') {
         return std::filesystem::path(env);
@@ -89,6 +65,30 @@ std::optional<std::string> prompt(const std::string& label) {
         return std::nullopt;
     }
     return trim(*line);
+}
+
+bool cmd_journal(const std::vector<std::string_view>& args, const std::filesystem::path& path) {
+    std::string text;
+    if (!args.empty()) {
+        for (std::size_t i = 0; i < args.size(); ++i) {
+            if (i) text.push_back(' ');
+            text += args[i];
+        }
+    } else {
+        auto raw = prompt("Entry:");
+        if (!raw.has_value() || raw->empty()) {
+            std::println(stderr, "{}aborted (empty entry){}", ansi::bright_yellow, ansi::reset);
+            return false;
+        }
+        text = *raw;
+    }
+    std::string err;
+    if (!append_journal_entry(path, text, err)) {
+        std::println(stderr, "{}error: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+    std::println("{}logged to {}{}", ansi::green, path.string(), ansi::reset);
+    return true;
 }
 
 std::optional<double> parse_double(std::string_view s) {
@@ -860,4 +860,3 @@ int run(int argc, char** argv) {
 }
 
 }  // namespace tt::cli
-
