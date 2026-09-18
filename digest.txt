@@ -1,0 +1,2150 @@
+Directory structure:
+└── trade-tracker-cli/
+    ├── README.md
+    ├── cmake_install.cmake
+    ├── CMakeLists.txt
+    └── src/
+        ├── main.cpp
+        ├── cli/
+        │   ├── cli.cpp
+        │   └── cli.hpp
+        ├── model/
+        │   ├── json.cpp
+        │   ├── json.hpp
+        │   ├── trade.cpp
+        │   └── trade.hpp
+        ├── storage/
+        │   ├── repository.cpp
+        │   └── repository.hpp
+        └── util/
+            ├── ansi.hpp
+            └── time_utils.hpp
+
+================================================
+FILE: README.md
+================================================
+### [WARNING]
+I vibe coded this entirely.
+
+# Trade Tracker CLI
+
+A modular, single-binary C++23 command-line day-trading journal that tracks
+trades, planned/realized R:R ratios, and aggregate performance statistics.
+
+## Requirements
+
+- A C++23 compiler with `<print>` support:
+  - **GCC 13.2+** (recommended 14+) â€” `<print>`/`std::print` are available.
+  - **Clang 16+** with a matching libstdc++ (Clang's own libc++ `<print>`
+    support lags, so building against libstdc++ is recommended).
+- CMake 3.20+ (optional â€” a plain compiler invocation also works).
+
+## Build
+
+### With CMake
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/trade-tracker help
+```
+
+### Direct compiler invocation
+
+```sh
+g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
+    -Isrc \
+    src/main.cpp src/cli/cli.cpp src/model/trade.cpp \
+    src/model/json.cpp src/storage/repository.cpp \
+    -o trade-tracker
+```
+
+(Clang: `clang++ -std=c++23 ... -stdlib=libstdc++`.)
+
+## Usage
+
+```sh
+# Interactive add
+./trade-tracker add
+
+# Flag-driven (non-interactive) add
+./trade-tracker add --type long --entry 100 --stop 95 --tp 110 --notes "breakout" --yes
+
+# Close an open trade
+./trade-tracker close 1
+
+# List
+./trade-tracker list            # open trades (default)
+./trade-tracker list all
+./trade-tracker list closed
+
+# Aggregate stats
+./trade-tracker stats
+```
+
+Journal data is persisted to `./trades.json` by default. Override with the
+`--file <path>` global flag or the `TT_DATA_FILE` environment variable.
+
+## Architecture
+
+```
+src/
+â”œâ”€â”€ main.cpp                  # process entry point
+â”œâ”€â”€ model/                    # domain layer
+â”‚   â”œâ”€â”€ trade.hpp / .cpp      # Trade entity + validation + calculated fields
+â”‚   â””â”€â”€ json.hpp / .cpp       # minimal JSON DOM / parser / serializer
+â”œâ”€â”€ storage/
+â”‚   â””â”€â”€ repository.hpp / .cpp # JSON-file persistence (load/save/CRUD)
+â”œâ”€â”€ cli/
+â”‚   â””â”€â”€ cli.hpp / .cpp        # command parsing, interactive prompts, formatting
+â””â”€â”€ util/
+    â”œâ”€â”€ ansi.hpp              # ANSI SGR color codes
+    â””â”€â”€ time_utils.hpp        # <chrono> timestamp <-> int64 micros + display
+```
+
+The layering is strict: `cli` depends on `storage` and `model`, `storage`
+depends on `model` (plus `json`), and `model` has no dependencies beyond the
+standard library. No external libraries are used.
+
+## How draft timing is captured accurately
+
+`creation_draft_start` is taken as the **first statement** inside `cmd_add`,
+before any flags are parsed and before any user input is solicited:
+
+```cpp
+bool cmd_add(Repository& repo, const std::vector<std::string_view>& args) {
+    const auto creation_draft_start = time_utils::now();  // <-- captured here
+    ...
+}
+```
+
+This guarantees the timestamp reflects the instant the `add` workflow began,
+not the moment the user finished typing. A separate `entry_time` is captured
+only when the user confirms and the trade is actually persisted, so the
+"thinking time" between draft start and commit is measured and stored
+independently. Both timestamps use `std::chrono::system_clock` (nanosecond
+resolution on Linux) and are persisted as microsecond counts since the Unix
+epoch, so no sub-second precision is lost on a round-trip.
+
+
+
+================================================
+FILE: cmake_install.cmake
+================================================
+# Install script for directory: C:/Users/saba/trade-tracker-cli
+
+# Set the install prefix
+if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+  set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/trade_tracker_cli")
+endif()
+string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
+
+# Set the install configuration name.
+if(NOT DEFINED CMAKE_INSTALL_CONFIG_NAME)
+  if(BUILD_TYPE)
+    string(REGEX REPLACE "^[^A-Za-z0-9_]+" ""
+           CMAKE_INSTALL_CONFIG_NAME "${BUILD_TYPE}")
+  else()
+    set(CMAKE_INSTALL_CONFIG_NAME "Release")
+  endif()
+  message(STATUS "Install configuration: \"${CMAKE_INSTALL_CONFIG_NAME}\"")
+endif()
+
+# Set the component getting installed.
+if(NOT CMAKE_INSTALL_COMPONENT)
+  if(COMPONENT)
+    message(STATUS "Install component: \"${COMPONENT}\"")
+    set(CMAKE_INSTALL_COMPONENT "${COMPONENT}")
+  else()
+    set(CMAKE_INSTALL_COMPONENT)
+  endif()
+endif()
+
+# Is this installation the result of a crosscompile?
+if(NOT DEFINED CMAKE_CROSSCOMPILING)
+  set(CMAKE_CROSSCOMPILING "FALSE")
+endif()
+
+# Set path to fallback-tool for dependency-resolution.
+if(NOT DEFINED CMAKE_OBJDUMP)
+  set(CMAKE_OBJDUMP "C:/ProgramData/mingw64/mingw64/bin/objdump.exe")
+endif()
+
+string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
+       "${CMAKE_INSTALL_MANIFEST_FILES}")
+if(CMAKE_INSTALL_LOCAL_ONLY)
+  file(WRITE "C:/Users/saba/trade-tracker-cli/install_local_manifest.txt"
+     "${CMAKE_INSTALL_MANIFEST_CONTENT}")
+endif()
+if(CMAKE_INSTALL_COMPONENT)
+  if(CMAKE_INSTALL_COMPONENT MATCHES "^[a-zA-Z0-9_.+-]+$")
+    set(CMAKE_INSTALL_MANIFEST "install_manifest_${CMAKE_INSTALL_COMPONENT}.txt")
+  else()
+    string(MD5 CMAKE_INST_COMP_HASH "${CMAKE_INSTALL_COMPONENT}")
+    set(CMAKE_INSTALL_MANIFEST "install_manifest_${CMAKE_INST_COMP_HASH}.txt")
+    unset(CMAKE_INST_COMP_HASH)
+  endif()
+else()
+  set(CMAKE_INSTALL_MANIFEST "install_manifest.txt")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  file(WRITE "C:/Users/saba/trade-tracker-cli/${CMAKE_INSTALL_MANIFEST}"
+     "${CMAKE_INSTALL_MANIFEST_CONTENT}")
+endif()
+
+
+
+================================================
+FILE: CMakeLists.txt
+================================================
+cmake_minimum_required(VERSION 3.20)
+project(trade_tracker_cli LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+add_executable(trade-tracker
+    src/main.cpp
+    src/cli/cli.cpp
+    src/model/trade.cpp
+    src/model/json.cpp
+    src/storage/repository.cpp
+)
+
+target_include_directories(trade-tracker PRIVATE src)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(trade-tracker PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+
+
+================================================
+FILE: src/main.cpp
+================================================
+#include "cli/cli.hpp"
+
+int main(int argc, char** argv) {
+    return tt::cli::run(argc, argv);
+}
+
+
+
+================================================
+FILE: src/cli/cli.cpp
+================================================
+#include "cli/cli.hpp"
+
+#include "model/trade.hpp"
+#include "util/ansi.hpp"
+#include "util/time_utils.hpp"
+
+#include <charconv>
+#include <cctype>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
+#include <format>
+#include <iostream>
+#include <print>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace tt::cli {
+
+namespace {
+
+std::filesystem::path default_data_file() {
+    if (const char* env = std::getenv("TT_DATA_FILE"); env != nullptr && *env != '\0') {
+        return std::filesystem::path(env);
+    }
+    return std::filesystem::path("trades.json");
+}
+
+std::string trim(std::string s) {
+    auto is_ws = [](unsigned char c) { return std::isspace(c) != 0; };
+    auto b = s.begin();
+    auto e = s.end();
+    while (b != e && is_ws(*b)) {
+        ++b;
+    }
+    while (b != e && is_ws(*(e - 1))) {
+        --e;
+    }
+    return std::string(b, e);
+}
+
+std::optional<std::string> read_line() {
+    std::string line;
+    if (!std::getline(std::cin, line)) {
+        return std::nullopt;  // EOF
+    }
+    return line;
+}
+
+std::optional<std::string> prompt(const std::string& label) {
+    std::print("{}{}{} ", ansi::cyan, label, ansi::reset);
+    std::cout.flush();
+    auto line = read_line();
+    if (!line.has_value()) {
+        return std::nullopt;
+    }
+    return trim(*line);
+}
+
+std::optional<double> parse_double(std::string_view s) {
+    double v = 0.0;
+    auto res = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (res.ec != std::errc{} || res.ptr != s.data() + s.size()) {
+        return std::nullopt;
+    }
+    return v;
+}
+
+std::optional<std::uint64_t> parse_id(std::string_view s) {
+    if (s.empty()) {
+        return std::nullopt;
+    }
+    std::uint64_t v = 0;
+    auto res = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (res.ec != std::errc{} || res.ptr != s.data() + s.size()) {
+        return std::nullopt;
+    }
+    return v;
+}
+
+std::optional<double> prompt_double(const std::string& label) {
+    while (true) {
+        auto raw = prompt(label);
+        if (!raw.has_value() || raw->empty()) {
+            return std::nullopt;  // EOF or blank -> abort
+        }
+        auto v = parse_double(*raw);
+        if (v.has_value()) {
+            return v;
+        }
+        std::println(stderr, "{}Invalid number: '{}'{}", ansi::bright_red, *raw,
+                     ansi::reset);
+    }
+}
+
+bool prompt_yes_no(const std::string& label) {
+    while (true) {
+        auto raw = prompt(label + " [y/N]");
+        if (!raw.has_value() || raw->empty()) {
+            return false;
+        }
+        char c = static_cast<char>(std::tolower(static_cast<unsigned char>((*raw)[0])));
+        if (c == 'y') {
+            return true;
+        }
+        if (c == 'n') {
+            return false;
+        }
+        std::println(stderr, "{}Please answer y or n.{}", ansi::bright_yellow, ansi::reset);
+    }
+}
+
+std::string format_price(double v) {
+    return std::format("{:.2f}", v);
+}
+
+std::string format_optional_price(std::optional<double> v) {
+    if (v.has_value()) {
+        return format_price(*v);
+    }
+    return "â€”";
+}
+
+}  // namespace
+
+namespace {
+
+// Options for flag-driven (non-interactive) `add`.
+struct AddOptions {
+    std::optional<TradeType> type;
+    std::optional<double> entry;
+    std::optional<double> stop;
+    std::optional<double> tp;
+    std::optional<std::string> notes;
+    bool yes = false;
+    std::optional<std::string> error;
+};
+
+AddOptions parse_add_flags(const std::vector<std::string_view>& args) {
+    AddOptions o;
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string_view a = args[i];
+        auto next = [&]() -> std::optional<std::string_view> {
+            if (i + 1 < args.size()) {
+                return args[i + 1];
+            }
+            return std::nullopt;
+        };
+        if (a == "--type") {
+            auto v = next();
+            if (!v.has_value()) {
+                o.error = "--type requires a value (long|short)";
+                return o;
+            }
+            if (*v == "long") {
+                o.type = TradeType::Long;
+            } else if (*v == "short") {
+                o.type = TradeType::Short;
+            } else {
+                o.error = "invalid --type value (expected long|short)";
+                return o;
+            }
+            ++i;
+        } else if (a == "--entry") {
+            auto v = next();
+            if (!v.has_value() || !parse_double(*v).has_value()) {
+                o.error = "--entry requires a numeric value";
+                return o;
+            }
+            o.entry = parse_double(*v);
+            ++i;
+        } else if (a == "--stop") {
+            auto v = next();
+            if (!v.has_value() || !parse_double(*v).has_value()) {
+                o.error = "--stop requires a numeric value";
+                return o;
+            }
+            o.stop = parse_double(*v);
+            ++i;
+        } else if (a == "--tp" || a == "--take-profit") {
+            auto v = next();
+            if (!v.has_value() || !parse_double(*v).has_value()) {
+                o.error = "--tp requires a numeric value";
+                return o;
+            }
+            o.tp = parse_double(*v);
+            ++i;
+        } else if (a == "--notes" || a == "--desc") {
+            auto v = next();
+            if (!v.has_value()) {
+                o.error = "--notes requires a string value";
+                return o;
+            }
+            o.notes = std::string(*v);
+            ++i;
+        } else if (a == "--yes" || a == "-y") {
+            o.yes = true;
+        } else {
+            o.error = "unknown flag: " + std::string(a);
+            return o;
+        }
+    }
+    return o;
+}
+
+}  // namespace
+
+
+bool cmd_add(Repository& repo, const std::vector<std::string_view>& args) {
+    // IMPORTANT: capture the draft-start timestamp as the very first action,
+    // before any flags are parsed or any user input is solicited. This makes
+    // `creation_draft_start` reflect the moment the `add` workflow began.
+    const auto creation_draft_start = time_utils::now();
+
+    const auto flags = parse_add_flags(args);
+    if (flags.error.has_value()) {
+        std::println(stderr, "{}error: {}{}", ansi::bright_red, *flags.error, ansi::reset);
+        return false;
+    }
+
+    // Determine whether we can run fully non-interactively.
+    const bool interactive = !flags.type.has_value() || !flags.entry.has_value() ||
+                             !flags.stop.has_value() || !flags.tp.has_value();
+
+    if (interactive) {
+        std::println("{}â€” New Trade â€”{}", ansi::bold, ansi::reset);
+    }
+
+    // Direction.
+    TradeType type;
+    if (flags.type.has_value()) {
+        type = *flags.type;
+    } else {
+        while (true) {
+            auto v = prompt("Direction [L]ong / [S]hort:");
+            if (!v.has_value()) {
+                std::println("Aborted.");
+                return false;
+            }
+            if (v->empty()) {
+                continue;
+            }
+            char c = static_cast<char>(std::tolower(static_cast<unsigned char>((*v)[0])));
+            if (c == 'l') {
+                type = TradeType::Long;
+                break;
+            }
+            if (c == 's') {
+                type = TradeType::Short;
+                break;
+            }
+            std::println(stderr, "{}Please enter L or S.{}", ansi::bright_yellow, ansi::reset);
+        }
+    }
+
+    // Entry price.
+    double entry;
+    if (flags.entry.has_value()) {
+        entry = *flags.entry;
+    } else {
+        auto v = prompt_double("Entry price:");
+        if (!v.has_value()) {
+            std::println("Aborted.");
+            return false;
+        }
+        entry = *v;
+    }
+
+    // Stop loss.
+    double stop;
+    if (flags.stop.has_value()) {
+        stop = *flags.stop;
+    } else {
+        auto v = prompt_double("Stop loss:");
+        if (!v.has_value()) {
+            std::println("Aborted.");
+            return false;
+        }
+        stop = *v;
+    }
+
+    // Take profit.
+    double tp;
+    if (flags.tp.has_value()) {
+        tp = *flags.tp;
+    } else {
+        auto v = prompt_double("Take profit:");
+        if (!v.has_value()) {
+            std::println("Aborted.");
+            return false;
+        }
+        tp = *v;
+    }
+
+    // Description / notes.
+    std::string description;
+    if (flags.notes.has_value()) {
+        description = *flags.notes;
+    } else if (interactive) {
+        auto v = prompt("Description (optional):");
+        if (v.has_value()) {
+            description = *v;
+        }
+    }
+
+    // Validate the setup.
+    if (auto err = validate_prices(type, entry, stop, tp); err.has_value()) {
+        std::println(stderr, "{}Validation error: {}{}", ansi::bright_red, *err, ansi::reset);
+        return false;
+    }
+
+
+    // Build the trade (status OPEN, exit fields empty).
+    Trade trade;
+    trade.id = repo.next_id();
+    trade.type = type;
+    trade.status = TradeStatus::Open;
+    trade.entry_price = entry;
+    trade.stop_loss = stop;
+    trade.take_profit = tp;
+    trade.description = description;
+    trade.creation_draft_start = creation_draft_start;
+
+    // Instant calculation summary (planned R:R).
+    const double risk = trade.risk_per_unit();
+    const double reward = trade.reward_per_unit();
+    const double rr = trade.planned_rr_ratio();
+
+    std::println("");
+    std::println("{}â”€â”€ Trade Summary â”€â”€{}", ansi::bold, ansi::reset);
+    std::println("  Direction : {}", (type == TradeType::Long) ? "LONG" : "SHORT");
+    std::println("  Entry     : {}", format_price(entry));
+    std::println("  Stop loss : {}  (risk {})", format_price(stop), format_price(risk));
+    std::println("  Take prof : {}  (reward {})", format_price(tp), format_price(reward));
+    std::println("  {}Planned R:R : {:.2f}{}", ansi::bold, rr, ansi::reset);
+    if (!description.empty()) {
+        std::println("  Notes     : {}", description);
+    }
+
+    // Final confirmation.
+    const bool confirmed = flags.yes || prompt_yes_no("Save this trade?");
+    if (!confirmed) {
+        std::println("{}Trade discarded.{}", ansi::yellow, ansi::reset);
+        return false;
+    }
+
+    // Confirmation timestamp = the moment the entry was committed.
+    trade.entry_time = time_utils::now();
+    repo.add(std::move(trade));
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} saved as OPEN.{}", ansi::green, repo.all().back().id, ansi::reset);
+    return true;
+}
+
+
+bool cmd_close(Repository& repo, std::uint64_t id) {
+    Trade* t = repo.find(id);
+    if (t == nullptr) {
+        std::println(stderr, "{}No trade with id {}.{}", ansi::bright_red, id, ansi::reset);
+        return false;
+    }
+    if (t->status != TradeStatus::Open) {
+        std::println(stderr, "{}Trade {} is not OPEN (status: {}).{}", ansi::bright_red, id,
+                     tt::to_string(t->status), ansi::reset);
+        return false;
+    }
+
+    std::println("{}Closing trade #{} ({} @ {}){}", ansi::bold, id, tt::to_string(t->type),
+                 format_price(t->entry_price), ansi::reset);
+
+    auto exit = prompt_double("Exit price:");
+    if (!exit.has_value()) {
+        std::println("Aborted.");
+        return false;
+    }
+    if (!std::isfinite(*exit) || *exit <= 0.0) {
+        std::println(stderr, "{}Exit price must be a positive finite number.{}", ansi::bright_red,
+                     ansi::reset);
+        return false;
+    }
+
+    std::string notes;
+    auto nv = prompt("Exit notes (optional):");
+    if (nv.has_value()) {
+        notes = *nv;
+    }
+
+    Trade updated = *t;
+    updated.exit_price = *exit;
+    updated.exit_notes = notes;
+    updated.exit_time = time_utils::now();
+    updated.status = TradeStatus::Closed;
+
+    // Final result summary.
+    const auto pnl = updated.realized_pnl_per_unit();
+    const auto r_multiple = updated.realized_r_multiple();
+    const Outcome outcome = updated.outcome();
+
+    std::string_view color = ansi::bright_yellow;
+    if (outcome == Outcome::Win) {
+        color = ansi::bright_green;
+    } else if (outcome == Outcome::Loss) {
+        color = ansi::bright_red;
+    }
+
+    std::println("");
+    std::println("{}â”€â”€ Close Result â”€â”€{}", ansi::bold, ansi::reset);
+    std::println("  Exit price : {}", format_price(*exit));
+    std::println("  PnL/unit   : {}{:+.2f}{}", color, pnl.value_or(0.0), ansi::reset);
+    std::println("  R-multiple : {}{:+.2f} R{}", color, r_multiple.value_or(0.0), ansi::reset);
+    std::println("  Outcome    : {}{}{}", color, tt::to_string(outcome), ansi::reset);
+
+    repo.update(updated);
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} closed.{}", ansi::green, id, ansi::reset);
+    return true;
+}
+
+bool cmd_list(const Repository& repo, std::string_view filter) {
+    const auto& trades = repo.all();
+    if (trades.empty()) {
+        std::println("No trades recorded yet. Use {}add{} to create one.", ansi::cyan, ansi::reset);
+        return true;
+    }
+
+    auto matches = [&](const Trade& t) {
+        if (filter == "all") {
+            return true;
+        }
+        if (filter == "closed") {
+            return t.status == TradeStatus::Closed;
+        }
+        // default: open
+        return t.status == TradeStatus::Open;
+    };
+
+    std::size_t shown = 0;
+    for (const auto& t : trades) {
+        if (matches(t)) {
+            ++shown;
+        }
+    }
+
+    if (shown == 0) {
+        std::println("No {} trades.", filter);
+        return true;
+    }
+
+    // Header.
+    std::println("");
+    std::println("{:<4} {:<6} {:<9} {:>10} {:>10} {:>10} {:>10} {:>8} {:>8} {:<9} {}",
+                 "ID", "TYPE", "STATUS", "ENTRY", "STOP", "TARGET", "EXIT", "R:R",
+                 "R-MULT", "OUTCOME", "ENTRY TIME");
+    std::println("{}", std::string(100, '-'));
+
+    for (const auto& t : trades) {
+        if (!matches(t)) {
+            continue;
+        }
+        std::string_view type_color = (t.type == TradeType::Long) ? ansi::bright_green
+                                                                  : ansi::bright_red;
+        std::string_view outcome_color = ansi::white;
+        if (t.status == TradeStatus::Closed) {
+            switch (t.outcome()) {
+                case Outcome::Win:
+                    outcome_color = ansi::bright_green;
+                    break;
+                case Outcome::Loss:
+                    outcome_color = ansi::bright_red;
+                    break;
+                case Outcome::Breakeven:
+                    outcome_color = ansi::bright_yellow;
+                    break;
+                case Outcome::Undefined:
+                    outcome_color = ansi::white;
+                    break;
+            }
+        }
+
+        const std::string exit_str = format_optional_price(t.exit_price);
+        const std::string r_mult_str = t.realized_r_multiple().has_value()
+                                           ? std::format("{:+.2f}", *t.realized_r_multiple())
+                                           : "â€”";
+
+        std::println(
+            "{:<4} {}{:<6}{} {:<9} {:>10} {:>10} {:>10} {:>10} {:>8.2f} {}{:>8}{} {}{:<9}{} {}",
+            t.id, type_color, tt::to_string(t.type), ansi::reset, tt::to_string(t.status),
+            format_price(t.entry_price), format_price(t.stop_loss), format_price(t.take_profit),
+            exit_str, t.planned_rr_ratio(), outcome_color, r_mult_str, ansi::reset,
+            outcome_color, (t.status == TradeStatus::Closed) ? tt::to_string(t.outcome()) : "â€”",
+            ansi::reset, time_utils::format(t.entry_time));
+    }
+    std::println("");
+    std::println("{} trade(s) shown.", shown);
+    return true;
+}
+
+
+bool cmd_stats(const Repository& repo) {
+    const auto& trades = repo.all();
+
+    std::size_t total = trades.size();
+    std::size_t open = 0;
+    std::size_t closed = 0;
+    std::size_t cancelled = 0;
+    std::size_t wins = 0;
+    std::size_t losses = 0;
+    std::size_t breakeven = 0;
+    double total_r = 0.0;
+    std::size_t closed_count = 0;
+    double planned_sum = 0.0;
+    std::size_t planned_count = 0;
+
+    for (const auto& t : trades) {
+        switch (t.status) {
+            case TradeStatus::Open:
+                ++open;
+                break;
+            case TradeStatus::Closed:
+                ++closed;
+                break;
+            case TradeStatus::Cancelled:
+                ++cancelled;
+                break;
+        }
+
+        if (t.status == TradeStatus::Closed) {
+            auto r = t.realized_r_multiple();
+            if (r.has_value()) {
+                total_r += *r;
+                ++closed_count;
+            }
+            switch (t.outcome()) {
+                case Outcome::Win:
+                    ++wins;
+                    break;
+                case Outcome::Loss:
+                    ++losses;
+                    break;
+                case Outcome::Breakeven:
+                    ++breakeven;
+                    break;
+                case Outcome::Undefined:
+                    break;
+            }
+        }
+
+        const double rr = t.planned_rr_ratio();
+        if (std::isfinite(rr) && rr > 0.0) {
+            planned_sum += rr;
+            ++planned_count;
+        }
+    }
+
+    const double win_rate = closed_count > 0 ? 100.0 * static_cast<double>(wins) /
+                                                   static_cast<double>(closed_count)
+                                             : 0.0;
+    const double avg_r = closed_count > 0 ? total_r / static_cast<double>(closed_count) : 0.0;
+    const double avg_planned =
+        planned_count > 0 ? planned_sum / static_cast<double>(planned_count) : 0.0;
+
+    std::println("");
+    std::println("{}â”€â”€ Statistics â”€â”€{}", ansi::bold, ansi::reset);
+    std::println("  Total trades    : {}", total);
+    std::println("  Open            : {}", open);
+    std::println("  Closed          : {}", closed);
+    std::println("  Cancelled       : {}", cancelled);
+    std::println("  Wins            : {}{}{}", ansi::bright_green, wins, ansi::reset);
+    std::println("  Losses          : {}{}{}", ansi::bright_red, losses, ansi::reset);
+    std::println("  Breakeven       : {}", breakeven);
+    std::println("  {}Win rate       : {:.2f}%{}", ansi::bold, win_rate, ansi::reset);
+    std::println("  Total R-multiple: {:+.2f} R", total_r);
+    std::println("  Avg R-multiple  : {:+.2f} R", avg_r);
+    std::println("  Avg planned R:R : {:.2f}", avg_planned);
+    std::println("");
+    return true;
+}
+
+
+void print_banner() {
+    std::println("{}Trade Tracker CLI{}", ansi::bold, ansi::reset);
+    std::println("{}Day trading journal & R-multiple tracker{}", ansi::dim, ansi::reset);
+}
+
+void print_help() {
+    print_banner();
+    std::println("");
+    std::println("{}Usage:{} trade-tracker <command> [options]", ansi::bold, ansi::reset);
+    std::println("");
+    std::println("{}Commands:{}", ansi::bold, ansi::reset);
+    std::println("  {}add{}                     Add a new trade (interactive)", ansi::cyan, ansi::reset);
+    std::println("  {}add --type long --entry 100 --stop 95 --tp 110 [--notes \"...\"] [--yes]{}",
+                 ansi::cyan, ansi::reset);
+    std::println("                            Non-interactive add (see flags below)");
+    std::println("  {}close <id>{}              Close an OPEN trade by id", ansi::cyan, ansi::reset);
+    std::println("  {}list [open|closed|all]{}  List trades (default: open)", ansi::cyan, ansi::reset);
+    std::println("  {}stats{}                   Show aggregate statistics", ansi::cyan, ansi::reset);
+    std::println("  {}help{}                    Show this help", ansi::cyan, ansi::reset);
+    std::println("");
+    std::println("{}Add flags:{}", ansi::bold, ansi::reset);
+    std::println("  --type long|short    Direction");
+    std::println("  --entry <number>     Entry price");
+    std::println("  --stop <number>      Stop loss price");
+    std::println("  --tp <number>        Take profit price");
+    std::println("  --notes <text>       Optional description");
+    std::println("  --yes / -y           Skip confirmation prompt");
+    std::println("");
+    std::println("{}Global option:{}", ansi::bold, ansi::reset);
+    std::println("  --file <path> / -f   Journal file (default: ./trades.json, or $TT_DATA_FILE)");
+}
+
+int run(int argc, char** argv) {
+    std::vector<std::string_view> args(argv + 1, argv + argc);
+    if (args.empty()) {
+        print_help();
+        return 1;
+    }
+
+    std::filesystem::path data_file = default_data_file();
+    std::vector<std::string_view> rest;
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string_view a = args[i];
+        if (a == "--file" || a == "-f") {
+            if (i + 1 >= args.size()) {
+                std::println(stderr, "{}error: {} requires a path{}", ansi::bright_red, a,
+                             ansi::reset);
+                return 2;
+            }
+            data_file = std::filesystem::path(args[++i]);
+        } else {
+            rest.push_back(a);
+        }
+    }
+
+    if (rest.empty()) {
+        print_help();
+        return 1;
+    }
+
+    const std::string_view cmd = rest[0];
+    if (cmd == "help" || cmd == "--help" || cmd == "-h") {
+        print_help();
+        return 0;
+    }
+
+    Repository repo(data_file);
+    std::string err;
+    if (!repo.load(err)) {
+        std::println(stderr, "{}error: failed to load journal: {}{}", ansi::bright_red, err,
+                     ansi::reset);
+        return 3;
+    }
+
+    if (cmd == "add") {
+        std::vector<std::string_view> add_args(rest.begin() + 1, rest.end());
+        return cmd_add(repo, add_args) ? 0 : 1;
+    }
+    if (cmd == "close") {
+        if (rest.size() < 2) {
+            std::println(stderr, "{}usage: close <id>{}", ansi::bright_red, ansi::reset);
+            return 2;
+        }
+        auto id = parse_id(rest[1]);
+        if (!id.has_value()) {
+            std::println(stderr, "{}invalid id: '{}'{}", ansi::bright_red, rest[1], ansi::reset);
+            return 2;
+        }
+        return cmd_close(repo, *id) ? 0 : 1;
+    }
+    if (cmd == "list") {
+        std::string_view filter = (rest.size() > 1) ? rest[1] : std::string_view{"open"};
+        if (filter != "open" && filter != "closed" && filter != "all") {
+            std::println(stderr, "{}invalid filter: '{}' (expected open|closed|all){}",
+                         ansi::bright_red, filter, ansi::reset);
+            return 2;
+        }
+        return cmd_list(repo, filter) ? 0 : 1;
+    }
+    if (cmd == "stats") {
+        return cmd_stats(repo) ? 0 : 1;
+    }
+
+    std::println(stderr, "{}unknown command: '{}'{}", ansi::bright_red, cmd, ansi::reset);
+    std::println(stderr, "Run {}help{} for usage.", ansi::cyan, ansi::reset);
+    return 2;
+}
+
+}  // namespace tt::cli
+
+
+
+
+================================================
+FILE: src/cli/cli.hpp
+================================================
+#pragma once
+
+#include "storage/repository.hpp"
+
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace tt::cli {
+
+// Entry point: parse argv, dispatch to the appropriate command, and return a
+// process exit code.
+int run(int argc, char** argv);
+
+// Individual commands. Each returns true on success.
+bool cmd_add(Repository& repo, const std::vector<std::string_view>& args);
+bool cmd_close(Repository& repo, std::uint64_t id);
+bool cmd_list(const Repository& repo, std::string_view filter);
+bool cmd_stats(const Repository& repo);
+
+void print_help();
+void print_banner();
+
+}  // namespace tt::cli
+
+
+
+================================================
+FILE: src/model/json.cpp
+================================================
+#include "model/json.hpp"
+
+#include <charconv>
+#include <cmath>
+#include <cstdio>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <utility>
+
+namespace tt::json {
+
+namespace {
+
+std::string escape_string(std::string_view s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    out.push_back('"');
+    for (char c : s) {
+        switch (c) {
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\b':
+                out += "\\b";
+                break;
+            case '\f':
+                out += "\\f";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof(buf), "\\u%04x",
+                                  static_cast<unsigned>(static_cast<unsigned char>(c)));
+                    out += buf;
+                } else {
+                    out.push_back(c);
+                }
+        }
+    }
+    out.push_back('"');
+    return out;
+}
+
+// Shortest round-trippable decimal for a double, or "null" if non-finite.
+std::string format_double(double d) {
+    if (!std::isfinite(d)) {
+        return "null";
+    }
+    char buf[64];
+    auto res = std::to_chars(buf, buf + sizeof(buf), d, std::chars_format::general);
+    return std::string(buf, res.ptr);
+}
+
+}  // namespace
+
+// ---- type predicates ----
+bool Value::is_null() const noexcept { return std::holds_alternative<std::monostate>(data_); }
+bool Value::is_bool() const noexcept { return std::holds_alternative<bool>(data_); }
+bool Value::is_int() const noexcept { return std::holds_alternative<std::int64_t>(data_); }
+bool Value::is_double() const noexcept { return std::holds_alternative<double>(data_); }
+bool Value::is_string() const noexcept { return std::holds_alternative<std::string>(data_); }
+bool Value::is_array() const noexcept { return std::holds_alternative<Array>(data_); }
+bool Value::is_object() const noexcept { return std::holds_alternative<Object>(data_); }
+
+bool Value::as_bool() const { return std::get<bool>(data_); }
+std::int64_t Value::as_int() const {
+    if (is_int()) {
+        return std::get<std::int64_t>(data_);
+    }
+    if (is_double()) {
+        return static_cast<std::int64_t>(std::get<double>(data_));
+    }
+    throw std::bad_variant_access();
+}
+double Value::as_double() const {
+    if (is_double()) {
+        return std::get<double>(data_);
+    }
+    if (is_int()) {
+        return static_cast<double>(std::get<std::int64_t>(data_));
+    }
+    throw std::bad_variant_access();
+}
+const std::string& Value::as_string() const { return std::get<std::string>(data_); }
+const Array& Value::as_array() const { return std::get<Array>(data_); }
+const Object& Value::as_object() const { return std::get<Object>(data_); }
+
+bool Value::contains(std::string_view key) const noexcept {
+    if (!is_object()) {
+        return false;
+    }
+    return std::get<Object>(data_).find(key) != std::get<Object>(data_).end();
+}
+
+const Value& Value::at(std::string_view key) const {
+    const auto& o = std::get<Object>(data_);
+    auto it = o.find(key);
+    if (it == o.end()) {
+        throw std::out_of_range("missing key: " + std::string(key));
+    }
+    return it->second;
+}
+
+const Value& Value::at(std::size_t index) const {
+    const auto& a = std::get<Array>(data_);
+    if (index >= a.size()) {
+        throw std::out_of_range("array index out of range");
+    }
+    return a[index];
+}
+
+// ---- serialize ----
+namespace {
+
+void dump_into(const Value& v, std::string& out) {
+    switch (v.type()) {
+        case Value::Type::Null:
+            out += "null";
+            break;
+        case Value::Type::Bool:
+            out += v.as_bool() ? "true" : "false";
+            break;
+        case Value::Type::Int:
+            out += std::to_string(v.as_int());
+            break;
+        case Value::Type::Double:
+            out += format_double(v.as_double());
+            break;
+        case Value::Type::String:
+            out += escape_string(v.as_string());
+            break;
+        case Value::Type::Array: {
+            out.push_back('[');
+            const auto& a = v.as_array();
+            for (std::size_t i = 0; i < a.size(); ++i) {
+                if (i) {
+                    out.push_back(',');
+                }
+                dump_into(a[i], out);
+            }
+            out.push_back(']');
+            break;
+        }
+        case Value::Type::Object: {
+            out.push_back('{');
+            const auto& o = v.as_object();
+            bool first = true;
+            for (const auto& [key, val] : o) {
+                if (!first) {
+                    out.push_back(',');
+                }
+                first = false;
+                out += escape_string(key);
+                out.push_back(':');
+                dump_into(val, out);
+            }
+            out.push_back('}');
+            break;
+        }
+    }
+}
+
+}  // namespace
+
+std::string dump(const Value& v) {
+    std::string out;
+    dump_into(v, out);
+    return out;
+}
+
+// ---- parser ----
+namespace {
+
+class Parser {
+public:
+    explicit Parser(std::string_view s) : s_(s) {}
+
+    Value parse() {
+        skip_ws();
+        Value v = parse_value();
+        skip_ws();
+        if (i_ != s_.size()) {
+            fail("unexpected trailing characters");
+        }
+        return v;
+    }
+
+private:
+    std::string_view s_;
+    std::size_t i_ = 0;
+
+    [[noreturn]] void fail(const std::string& msg) {
+        throw std::runtime_error("JSON parse error at offset " + std::to_string(i_) +
+                                 ": " + msg);
+    }
+
+    void skip_ws() {
+        while (i_ < s_.size()) {
+            char c = s_[i_];
+            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                ++i_;
+            } else {
+                break;
+            }
+        }
+    }
+
+    char peek() {
+        if (i_ >= s_.size()) {
+            fail("unexpected end of input");
+        }
+        return s_[i_];
+    }
+
+    void expect(char c) {
+        if (i_ >= s_.size() || s_[i_] != c) {
+            fail(std::string("expected '") + c + "'");
+        }
+        ++i_;
+    }
+
+    void consume_literal(std::string_view lit) {
+        if (s_.substr(i_, lit.size()) != lit) {
+            fail("invalid literal");
+        }
+        i_ += lit.size();
+    }
+
+    Value parse_value() {
+        char c = peek();
+        switch (c) {
+            case 'n':
+                consume_literal("null");
+                return Value{};
+            case 't':
+                consume_literal("true");
+                return Value{true};
+            case 'f':
+                consume_literal("false");
+                return Value{false};
+            case '"':
+                return Value{parse_string()};
+            case '[':
+                return Value{parse_array()};
+            case '{':
+                return Value{parse_object()};
+            default:
+                if (c == '-' || (c >= '0' && c <= '9')) {
+                    return parse_number();
+                }
+                fail("unexpected character");
+        }
+    }
+
+    std::string parse_string() {
+        expect('"');
+        std::string out;
+        while (true) {
+            if (i_ >= s_.size()) {
+                fail("unterminated string");
+            }
+            char c = s_[i_++];
+            if (c == '"') {
+                break;
+            }
+            if (c == '\\') {
+                if (i_ >= s_.size()) {
+                    fail("unterminated escape");
+                }
+                char e = s_[i_++];
+                switch (e) {
+                    case '"':
+                        out.push_back('"');
+                        break;
+                    case '\\':
+                        out.push_back('\\');
+                        break;
+                    case '/':
+                        out.push_back('/');
+                        break;
+                    case 'b':
+                        out.push_back('\b');
+                        break;
+                    case 'f':
+                        out.push_back('\f');
+                        break;
+                    case 'n':
+                        out.push_back('\n');
+                        break;
+                    case 'r':
+                        out.push_back('\r');
+                        break;
+                    case 't':
+                        out.push_back('\t');
+                        break;
+                    case 'u': {
+                        if (i_ + 4 > s_.size()) {
+                            fail("invalid unicode escape");
+                        }
+                        unsigned code = 0;
+                        for (int k = 0; k < 4; ++k) {
+                            char h = s_[i_++];
+                            code <<= 4;
+                            if (h >= '0' && h <= '9') {
+                                code |= static_cast<unsigned>(h - '0');
+                            } else if (h >= 'a' && h <= 'f') {
+                                code |= static_cast<unsigned>(h - 'a' + 10);
+                            } else if (h >= 'A' && h <= 'F') {
+                                code |= static_cast<unsigned>(h - 'A' + 10);
+                            } else {
+                                fail("invalid unicode escape");
+                            }
+                        }
+                        append_utf8(out, code);
+                        break;
+                    }
+                    default:
+                        fail("invalid escape character");
+                }
+            } else {
+                out.push_back(c);
+            }
+        }
+        return out;
+    }
+
+    static void append_utf8(std::string& out, unsigned code) {
+        if (code < 0x80) {
+            out.push_back(static_cast<char>(code));
+        } else if (code < 0x800) {
+            out.push_back(static_cast<char>(0xC0 | (code >> 6)));
+            out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+        } else {
+            out.push_back(static_cast<char>(0xE0 | (code >> 12)));
+            out.push_back(static_cast<char>(0x80 | ((code >> 6) & 0x3F)));
+            out.push_back(static_cast<char>(0x80 | (code & 0x3F)));
+        }
+    }
+
+
+    Array parse_array() {
+        expect('[');
+        Array a;
+        skip_ws();
+        if (i_ < s_.size() && s_[i_] == ']') {
+            ++i_;
+            return a;
+        }
+        while (true) {
+            skip_ws();
+            a.push_back(parse_value());
+            skip_ws();
+            char c = peek();
+            if (c == ',') {
+                ++i_;
+                continue;
+            }
+            if (c == ']') {
+                ++i_;
+                break;
+            }
+            fail("expected ',' or ']'");
+        }
+        return a;
+    }
+
+    Object parse_object() {
+        expect('{');
+        Object o;
+        skip_ws();
+        if (i_ < s_.size() && s_[i_] == '}') {
+            ++i_;
+            return o;
+        }
+        while (true) {
+            skip_ws();
+            if (peek() != '"') {
+                fail("expected string key");
+            }
+            std::string key = parse_string();
+            skip_ws();
+            expect(':');
+            skip_ws();
+            Value val = parse_value();
+            o[std::move(key)] = std::move(val);
+            skip_ws();
+            char c = peek();
+            if (c == ',') {
+                ++i_;
+                continue;
+            }
+            if (c == '}') {
+                ++i_;
+                break;
+            }
+            fail("expected ',' or '}'");
+        }
+        return o;
+    }
+
+    Value parse_number() {
+        std::size_t start = i_;
+        if (i_ < s_.size() && s_[i_] == '-') {
+            ++i_;
+        }
+        while (i_ < s_.size()) {
+            char c = s_[i_];
+            if ((c >= '0' && c <= '9') || c == '.' || c == 'e' || c == 'E' ||
+                c == '+' || c == '-') {
+                ++i_;
+            } else {
+                break;
+            }
+        }
+        std::string_view tok = s_.substr(start, i_ - start);
+        const bool is_double = tok.find('.') != std::string_view::npos ||
+                               tok.find('e') != std::string_view::npos ||
+                               tok.find('E') != std::string_view::npos;
+        if (is_double) {
+            double d = 0.0;
+            auto res = std::from_chars(tok.data(), tok.data() + tok.size(), d);
+            if (res.ec != std::errc{} || res.ptr != tok.data() + tok.size()) {
+                fail("invalid number");
+            }
+            return Value{d};
+        }
+        std::int64_t n = 0;
+        auto res = std::from_chars(tok.data(), tok.data() + tok.size(), n);
+        if (res.ec != std::errc{} || res.ptr != tok.data() + tok.size()) {
+            // Too large for int64 â€” fall back to double.
+            double d = 0.0;
+            auto r2 = std::from_chars(tok.data(), tok.data() + tok.size(), d);
+            if (r2.ec != std::errc{} || r2.ptr != tok.data() + tok.size()) {
+                fail("invalid number");
+            }
+            return Value{d};
+        }
+        return Value{n};
+    }
+};
+
+}  // namespace
+
+Value parse(std::string_view text, std::string& error) {
+    try {
+        Parser p(text);
+        return p.parse();
+    } catch (const std::exception& e) {
+        error = e.what();
+        return Value{};
+    }
+}
+
+}  // namespace tt::json
+
+
+
+
+================================================
+FILE: src/model/json.hpp
+================================================
+#pragma once
+
+#include <cstdint>
+#include <map>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
+
+// A minimal, dependency-free JSON Document Object Model (DOM) and
+// serializer/parser used for persistence. Numbers are kept as either a signed
+// 64-bit integer or a double so large integer fields (ids, microsecond
+// timestamps) survive a round-trip without floating-point precision loss.
+namespace tt::json {
+
+class Value;
+
+using Array = std::vector<Value>;
+using Object = std::map<std::string, Value, std::less<>>;
+
+class Value {
+public:
+    enum class Type { Null, Bool, Int, Double, String, Array, Object };
+
+    Value() : data_(std::monostate{}) {}
+    Value(std::nullptr_t) : data_(std::monostate{}) {}
+    Value(bool b) : data_(b) {}
+    Value(int v) : data_(static_cast<std::int64_t>(v)) {}
+    Value(std::int64_t v) : data_(v) {}
+    Value(double d) : data_(d) {}
+    Value(const char* s) : data_(std::string(s)) {}
+    Value(std::string s) : data_(std::move(s)) {}
+    Value(Array a) : data_(std::move(a)) {}
+    Value(Object o) : data_(std::move(o)) {}
+
+    Type type() const noexcept { return static_cast<Type>(data_.index()); }
+
+    bool is_null() const noexcept;
+    bool is_bool() const noexcept;
+    bool is_int() const noexcept;
+    bool is_double() const noexcept;
+    bool is_number() const noexcept { return is_int() || is_double(); }
+    bool is_string() const noexcept;
+    bool is_array() const noexcept;
+    bool is_object() const noexcept;
+
+    bool as_bool() const;
+    std::int64_t as_int() const;
+    double as_double() const;
+    const std::string& as_string() const;
+    const Array& as_array() const;
+    const Object& as_object() const;
+
+    // Object access (throws std::out_of_range when missing).
+    bool contains(std::string_view key) const noexcept;
+    const Value& at(std::string_view key) const;
+
+    // Array access.
+    const Value& at(std::size_t index) const;
+
+private:
+    std::variant<std::monostate, bool, std::int64_t, double, std::string, Array,
+                 Object>
+        data_;
+};
+
+// Serialize a Value into compact JSON text.
+std::string dump(const Value& v);
+
+// Parse JSON text into a Value. On failure, sets `error` and returns a null
+// Value (does not throw).
+Value parse(std::string_view text, std::string& error);
+
+}  // namespace tt::json
+
+
+
+================================================
+FILE: src/model/trade.cpp
+================================================
+#include "model/trade.hpp"
+
+#include <cmath>
+
+namespace tt {
+
+std::string_view to_string(TradeType t) noexcept {
+    switch (t) {
+        case TradeType::Long:
+            return "LONG";
+        case TradeType::Short:
+            return "SHORT";
+    }
+    return "UNKNOWN";
+}
+
+std::string_view to_string(TradeStatus s) noexcept {
+    switch (s) {
+        case TradeStatus::Open:
+            return "OPEN";
+        case TradeStatus::Closed:
+            return "CLOSED";
+        case TradeStatus::Cancelled:
+            return "CANCELLED";
+    }
+    return "UNKNOWN";
+}
+
+std::string_view to_string(Outcome o) noexcept {
+    switch (o) {
+        case Outcome::Win:
+            return "WIN";
+        case Outcome::Loss:
+            return "LOSS";
+        case Outcome::Breakeven:
+            return "BREAKEVEN";
+        case Outcome::Undefined:
+            return "â€”";
+    }
+    return "â€”";
+}
+
+double Trade::risk_per_unit() const noexcept {
+    return std::abs(entry_price - stop_loss);
+}
+
+double Trade::reward_per_unit() const noexcept {
+    return std::abs(take_profit - entry_price);
+}
+
+double Trade::planned_rr_ratio() const noexcept {
+    const double risk = risk_per_unit();
+    if (risk == 0.0 || !std::isfinite(risk)) {
+        return 0.0;
+    }
+    return reward_per_unit() / risk;
+}
+
+std::optional<double> Trade::realized_pnl_per_unit() const noexcept {
+    if (status != TradeStatus::Closed || !exit_price.has_value()) {
+        return std::nullopt;
+    }
+    const double exit = *exit_price;
+    return (type == TradeType::Long) ? (exit - entry_price)
+                                     : (entry_price - exit);
+}
+
+std::optional<double> Trade::realized_r_multiple() const noexcept {
+    const double risk = risk_per_unit();
+    if (risk == 0.0 || !std::isfinite(risk)) {
+        return std::nullopt;
+    }
+    auto pnl = realized_pnl_per_unit();
+    if (!pnl.has_value()) {
+        return std::nullopt;
+    }
+    return *pnl / risk;
+}
+
+Outcome Trade::outcome() const noexcept {
+    auto r = realized_r_multiple();
+    if (!r.has_value()) {
+        return Outcome::Undefined;
+    }
+    constexpr double epsilon = 1e-9;
+    if (*r > epsilon) {
+        return Outcome::Win;
+    }
+    if (*r < -epsilon) {
+        return Outcome::Loss;
+    }
+    return Outcome::Breakeven;
+}
+
+std::optional<std::string> validate_prices(TradeType type,
+                                           double entry,
+                                           double stop,
+                                           double target) noexcept {
+    if (!std::isfinite(entry) || !std::isfinite(stop) || !std::isfinite(target)) {
+        return "all prices must be finite numbers";
+    }
+    if (entry <= 0.0 || stop <= 0.0 || target <= 0.0) {
+        return "all prices must be positive numbers greater than zero";
+    }
+    if (stop == entry) {
+        return "stop loss cannot equal the entry price";
+    }
+    if (target == entry) {
+        return "take profit cannot equal the entry price";
+    }
+    if (type == TradeType::Long) {
+        if (!(stop < entry)) {
+            return "for a LONG trade, stop loss must be below the entry price";
+        }
+        if (!(target > entry)) {
+            return "for a LONG trade, take profit must be above the entry price";
+        }
+    } else {
+        if (!(stop > entry)) {
+            return "for a SHORT trade, stop loss must be above the entry price";
+        }
+        if (!(target < entry)) {
+            return "for a SHORT trade, take profit must be below the entry price";
+        }
+    }
+    return std::nullopt;
+}
+
+}  // namespace tt
+
+
+
+================================================
+FILE: src/model/trade.hpp
+================================================
+#pragma once
+
+#include <chrono>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+
+namespace tt {
+
+enum class TradeType { Long, Short };
+enum class TradeStatus { Open, Closed, Cancelled };
+enum class Outcome { Win, Loss, Breakeven, Undefined };
+
+std::string_view to_string(TradeType t) noexcept;
+std::string_view to_string(TradeStatus s) noexcept;
+std::string_view to_string(Outcome o) noexcept;
+
+// Pure data model for a single trade. Contains no I/O or persistence logic;
+// all derived/calculated values are computed on demand from the raw fields.
+struct Trade {
+    std::uint64_t id{0};
+    TradeType type{TradeType::Long};
+    TradeStatus status{TradeStatus::Open};
+
+    double entry_price{0.0};
+    double stop_loss{0.0};
+    double take_profit{0.0};
+    std::optional<double> exit_price{};
+
+    std::string description{};
+    std::string exit_notes{};
+
+    // Timestamps. See time_utils.hpp for the on-disk representation.
+    std::chrono::system_clock::time_point creation_draft_start{};
+    std::chrono::system_clock::time_point entry_time{};
+    std::optional<std::chrono::system_clock::time_point> exit_time{};
+
+    // ---- Calculated (automated) ----
+
+    // Risk per unit: |entry - stop_loss|.
+    double risk_per_unit() const noexcept;
+
+    // Reward per unit: |take_profit - entry|.
+    double reward_per_unit() const noexcept;
+
+    // Planned reward:risk ratio (reward / risk). 0.0 if risk is zero/invalid.
+    double planned_rr_ratio() const noexcept;
+
+    // Signed profit/loss per unit, only meaningful when CLOSED with an exit.
+    // Long:  exit - entry;   Short: entry - exit.
+    std::optional<double> realized_pnl_per_unit() const noexcept;
+
+    // Realized R-multiple = pnl_per_unit / risk_per_unit. Only when closed.
+    std::optional<double> realized_r_multiple() const noexcept;
+
+    Outcome outcome() const noexcept;
+};
+
+// Validate that entry/stop/target are mutually consistent with the trade
+// direction. Returns a human-readable error message on failure, or nullopt
+// when the prices form a valid trade setup.
+std::optional<std::string> validate_prices(TradeType type,
+                                           double entry,
+                                           double stop,
+                                           double target) noexcept;
+
+}  // namespace tt
+
+
+
+================================================
+FILE: src/storage/repository.cpp
+================================================
+#include "storage/repository.hpp"
+
+#include "model/json.hpp"
+#include "util/time_utils.hpp"
+
+#include <fstream>
+#include <sstream>
+#include <utility>
+
+namespace tt {
+
+namespace {
+
+json::Object trade_to_json(const Trade& t) {
+    json::Object o;
+    o["id"] = json::Value{static_cast<std::int64_t>(t.id)};
+    o["type"] = json::Value{std::string(to_string(t.type))};
+    o["status"] = json::Value{std::string(to_string(t.status))};
+    o["entry_price"] = json::Value{t.entry_price};
+    o["stop_loss"] = json::Value{t.stop_loss};
+    o["take_profit"] = json::Value{t.take_profit};
+    if (t.exit_price.has_value()) {
+        o["exit_price"] = json::Value{*t.exit_price};
+    } else {
+        o["exit_price"] = json::Value{};
+    }
+    o["description"] = json::Value{t.description};
+    o["exit_notes"] = json::Value{t.exit_notes};
+    o["creation_draft_start"] = json::Value{time_utils::to_micros(t.creation_draft_start)};
+    o["entry_time"] = json::Value{time_utils::to_micros(t.entry_time)};
+    if (t.exit_time.has_value()) {
+        o["exit_time"] = json::Value{time_utils::to_micros(*t.exit_time)};
+    } else {
+        o["exit_time"] = json::Value{};
+    }
+    return o;
+}
+
+bool parse_type(std::string_view s, TradeType& out) {
+    if (s == "LONG") {
+        out = TradeType::Long;
+        return true;
+    }
+    if (s == "SHORT") {
+        out = TradeType::Short;
+        return true;
+    }
+    return false;
+}
+
+bool parse_status(std::string_view s, TradeStatus& out) {
+    if (s == "OPEN") {
+        out = TradeStatus::Open;
+        return true;
+    }
+    if (s == "CLOSED") {
+        out = TradeStatus::Closed;
+        return true;
+    }
+    if (s == "CANCELLED") {
+        out = TradeStatus::Cancelled;
+        return true;
+    }
+    return false;
+}
+
+std::optional<Trade> trade_from_json(const json::Value& v) {
+    if (!v.is_object()) {
+        return std::nullopt;
+    }
+    const auto& o = v.as_object();
+    auto has = [&](std::string_view k) { return o.find(k) != o.end(); };
+    if (!has("id") || !has("type") || !has("status") || !has("entry_price") ||
+        !has("stop_loss") || !has("take_profit")) {
+        return std::nullopt;
+    }
+    try {
+        Trade t;
+        t.id = static_cast<std::uint64_t>(v.at("id").as_int());
+        if (!parse_type(v.at("type").as_string(), t.type)) {
+            return std::nullopt;
+        }
+        if (!parse_status(v.at("status").as_string(), t.status)) {
+            return std::nullopt;
+        }
+        t.entry_price = v.at("entry_price").as_double();
+        t.stop_loss = v.at("stop_loss").as_double();
+        t.take_profit = v.at("take_profit").as_double();
+        if (v.contains("exit_price") && v.at("exit_price").is_number()) {
+            t.exit_price = v.at("exit_price").as_double();
+        }
+        if (v.contains("description") && v.at("description").is_string()) {
+            t.description = v.at("description").as_string();
+        }
+        if (v.contains("exit_notes") && v.at("exit_notes").is_string()) {
+            t.exit_notes = v.at("exit_notes").as_string();
+        }
+        if (v.contains("creation_draft_start")) {
+            t.creation_draft_start =
+                time_utils::from_micros(v.at("creation_draft_start").as_int());
+        }
+        if (v.contains("entry_time")) {
+            t.entry_time = time_utils::from_micros(v.at("entry_time").as_int());
+        }
+        if (v.contains("exit_time") && v.at("exit_time").is_number()) {
+            t.exit_time = time_utils::from_micros(v.at("exit_time").as_int());
+        }
+        return t;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+}  // namespace
+
+Repository::Repository(std::filesystem::path path) : path_(std::move(path)) {}
+
+bool Repository::load(std::string& error) {
+    trades_.clear();
+    std::error_code ec;
+    if (!std::filesystem::exists(path_, ec)) {
+        return true;  // fresh journal
+    }
+    std::ifstream in(path_, std::ios::binary);
+    if (!in) {
+        error = "cannot open " + path_.string();
+        return false;
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    const std::string text = ss.str();
+    if (text.empty()) {
+        return true;
+    }
+
+    std::string parse_err;
+    json::Value root = json::parse(text, parse_err);
+    if (!parse_err.empty()) {
+        error = parse_err;
+        return false;
+    }
+    if (!root.is_array()) {
+        error = "expected a top-level JSON array in " + path_.string();
+        return false;
+    }
+    for (const auto& item : root.as_array()) {
+        auto t = trade_from_json(item);
+        if (!t.has_value()) {
+            error = "malformed trade record in " + path_.string();
+            return false;
+        }
+        trades_.push_back(std::move(*t));
+    }
+    return true;
+}
+
+bool Repository::save(std::string& error) const {
+    json::Array arr;
+    arr.reserve(trades_.size());
+    for (const auto& t : trades_) {
+        arr.push_back(json::Value{trade_to_json(t)});
+    }
+    const std::string text = json::dump(json::Value{std::move(arr)});
+
+    // Atomic write: serialize to a temp file, then rename over the target so a
+    // crash mid-write never leaves a truncated journal.
+    auto tmp = path_;
+    tmp += ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            error = "cannot write " + tmp.string();
+            return false;
+        }
+        out << text;
+        if (!out) {
+            error = "write failed for " + tmp.string();
+            return false;
+        }
+    }
+    std::error_code ec;
+    std::filesystem::rename(tmp, path_, ec);
+    if (ec) {
+        // Fall back for filesystems without atomic rename semantics.
+        std::filesystem::copy_file(tmp, path_,
+                                   std::filesystem::copy_options::overwrite_existing, ec);
+        if (ec) {
+            error = "cannot replace " + path_.string();
+            return false;
+        }
+        std::filesystem::remove(tmp, ec);
+    }
+    return true;
+}
+
+std::uint64_t Repository::next_id() const noexcept {
+    std::uint64_t max_id = 0;
+    for (const auto& t : trades_) {
+        if (t.id > max_id) {
+            max_id = t.id;
+        }
+    }
+    return max_id + 1;
+}
+
+const Trade* Repository::find(std::uint64_t id) const noexcept {
+    for (const auto& t : trades_) {
+        if (t.id == id) {
+            return &t;
+        }
+    }
+    return nullptr;
+}
+
+Trade* Repository::find(std::uint64_t id) noexcept {
+    for (auto& t : trades_) {
+        if (t.id == id) {
+            return &t;
+        }
+    }
+    return nullptr;
+}
+
+void Repository::add(Trade trade) {
+    trades_.push_back(std::move(trade));
+}
+
+bool Repository::update(const Trade& trade) noexcept {
+    for (auto& t : trades_) {
+        if (t.id == trade.id) {
+            t = trade;
+            return true;
+        }
+    }
+    return false;
+}
+
+}  // namespace tt
+
+
+
+
+================================================
+FILE: src/storage/repository.hpp
+================================================
+#pragma once
+
+#include "model/trade.hpp"
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace tt {
+
+// Lightweight JSON-file-backed repository of trades. Owns the in-memory
+// collection and provides load/save plus simple CRUD. It knows nothing about
+// the CLI or terminal formatting; serialization of the Trade model lives here
+// (in repository.cpp) as a persistence concern.
+class Repository {
+public:
+    explicit Repository(std::filesystem::path path);
+
+    // Load trades from disk. A missing file is treated as a fresh, empty
+    // journal (returns true). Returns false and sets `error` on read/parse
+    // failure.
+    bool load(std::string& error);
+
+    // Persist trades to disk atomically (temp file + rename).
+    bool save(std::string& error) const;
+
+    // Smallest unused id (max existing id + 1, or 1 for an empty journal).
+    std::uint64_t next_id() const noexcept;
+
+    const Trade* find(std::uint64_t id) const noexcept;
+    Trade* find(std::uint64_t id) noexcept;
+
+    const std::vector<Trade>& all() const noexcept { return trades_; }
+    std::vector<Trade>& all() noexcept { return trades_; }
+
+    void add(Trade trade);
+
+    // Replace an existing trade by id; returns false if not found.
+    bool update(const Trade& trade) noexcept;
+
+    const std::filesystem::path& path() const noexcept { return path_; }
+
+private:
+    std::filesystem::path path_;
+    std::vector<Trade> trades_;
+};
+
+}  // namespace tt
+
+
+
+================================================
+FILE: src/util/ansi.hpp
+================================================
+#pragma once
+
+#include <string_view>
+
+// Minimal ANSI SGR (Select Graphic Rendition) escape sequences for terminal
+// styling. Kept in a header-only namespace so any layer can use it without
+// pulling in heavier dependencies.
+namespace tt::ansi {
+
+inline constexpr std::string_view reset = "\033[0m";
+inline constexpr std::string_view bold = "\033[1m";
+inline constexpr std::string_view dim = "\033[2m";
+inline constexpr std::string_view underline = "\033[4m";
+
+inline constexpr std::string_view black = "\033[30m";
+inline constexpr std::string_view red = "\033[31m";
+inline constexpr std::string_view green = "\033[32m";
+inline constexpr std::string_view yellow = "\033[33m";
+inline constexpr std::string_view blue = "\033[34m";
+inline constexpr std::string_view magenta = "\033[35m";
+inline constexpr std::string_view cyan = "\033[36m";
+inline constexpr std::string_view white = "\033[37m";
+
+inline constexpr std::string_view bright_black = "\033[90m";
+inline constexpr std::string_view bright_red = "\033[91m";
+inline constexpr std::string_view bright_green = "\033[92m";
+inline constexpr std::string_view bright_yellow = "\033[93m";
+inline constexpr std::string_view bright_blue = "\033[94m";
+inline constexpr std::string_view bright_magenta = "\033[95m";
+inline constexpr std::string_view bright_cyan = "\033[96m";
+inline constexpr std::string_view bright_white = "\033[97m";
+
+}  // namespace tt::ansi
+
+
+
+================================================
+FILE: src/util/time_utils.hpp
+================================================
+#pragma once
+
+#include <chrono>
+#include <cstdint>
+#include <format>
+#include <optional>
+#include <string>
+
+// Time helpers built exclusively on <chrono>.
+//
+// Persistence stores timestamps as signed 64-bit counts of microseconds since
+// the Unix epoch. This is lossless for system_clock (which on Linux has
+// nanosecond resolution) and trivially round-trippable, unlike text ISO-8601
+// parsing which can lose sub-second precision or timezone information.
+//
+// Display formatting is done lazily in ::format() using the C++20 chrono
+// calendar/zoned_time facilities, so the on-disk representation stays simple
+// and precise while the user-visible output is human readable.
+namespace tt::time_utils {
+
+using clock = std::chrono::system_clock;
+using time_point = clock::time_point;
+
+inline time_point now() {
+    return clock::now();
+}
+
+inline std::int64_t to_micros(time_point tp) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch())
+        .count();
+}
+
+inline time_point from_micros(std::int64_t us) {
+    return time_point{std::chrono::microseconds{us}};
+}
+
+// Format a time_point as a local-time string with microsecond precision,
+// e.g. "2026-09-17 21:42:03.123456".
+inline std::string format(time_point tp) {
+    using namespace std::chrono;
+
+    auto micros = time_point_cast<microseconds>(tp);
+    auto secs = time_point_cast<seconds>(micros);
+    auto frac = micros - secs;  // remainder: [0, 1) seconds, in microseconds
+
+    std::string base;
+    try {
+        // Local wall-clock time via the system timezone database.
+        base = std::format("{:%Y-%m-%d %H:%M:%S}", zoned_time{current_zone(), secs});
+    } catch (...) {
+        // Fall back to UTC if the tz database is unavailable.
+        base = std::format("{:%Y-%m-%d %H:%M:%S}", secs);
+    }
+    return std::format("{}.{:06}", base, frac.count());
+}
+
+inline std::string format(std::optional<time_point> tp) {
+    if (tp.has_value()) {
+        return format(*tp);
+    }
+    return "â€”";
+}
+
+}  // namespace tt::time_utils
+
+

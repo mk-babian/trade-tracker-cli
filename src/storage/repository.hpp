@@ -39,6 +39,9 @@ public:
     // Replace an existing trade by id; returns false if not found.
     bool update(const Trade& trade) noexcept;
 
+    // Remove a trade by id; returns false if not found.
+    bool remove(std::uint64_t id) noexcept;
+
     const std::filesystem::path& path() const noexcept { return path_; }
 
 private:

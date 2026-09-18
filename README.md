@@ -48,6 +48,10 @@ g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
 # Close an open trade
 ./trade-tracker close 1
 
+# Delete a trade (prompts for confirmation)
+./trade-tracker delete 1
+./trade-tracker delete 1 --yes   # skip confirmation
+
 # List
 ./trade-tracker list            # open trades (default)
 ./trade-tracker list all

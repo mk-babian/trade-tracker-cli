@@ -235,5 +235,15 @@ bool Repository::update(const Trade& trade) noexcept {
     return false;
 }
 
+bool Repository::remove(std::uint64_t id) noexcept {
+    for (auto it = trades_.begin(); it != trades_.end(); ++it) {
+        if (it->id == id) {
+            trades_.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace tt
 

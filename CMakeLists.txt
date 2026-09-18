@@ -19,6 +19,11 @@ add_executable(trade-tracker
 
 target_include_directories(trade-tracker PRIVATE src)
 
+if(MINGW)
+    target_link_libraries(trade-tracker PRIVATE stdc++exp)
+    target_link_options(trade-tracker PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(trade-tracker PRIVATE -Wall -Wextra -Wpedantic)
 endif()

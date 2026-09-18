@@ -430,6 +430,44 @@ bool cmd_close(Repository& repo, std::uint64_t id) {
     return true;
 }
 
+bool cmd_delete(Repository& repo, std::uint64_t id, bool force) {
+    const Trade* t = repo.find(id);
+    if (t == nullptr) {
+        std::println(stderr, "{}No trade with id {}.{}", ansi::bright_red, id, ansi::reset);
+        return false;
+    }
+
+    // Show what is about to be deleted before asking for confirmation.
+    std::println("");
+    std::println("{}── Delete Trade #{} ──{}", ansi::bold, id, ansi::reset);
+    std::println("  Direction : {}", tt::to_string(t->type));
+    std::println("  Status    : {}", tt::to_string(t->status));
+    std::println("  Entry     : {}", format_price(t->entry_price));
+    std::println("  Stop loss : {}", format_price(t->stop_loss));
+    std::println("  Take prof : {}", format_price(t->take_profit));
+    if (!t->description.empty()) {
+        std::println("  Notes     : {}", t->description);
+    }
+    std::println("");
+
+    const bool confirmed = force || prompt_yes_no("Delete this trade?");
+    if (!confirmed) {
+        std::println("{}Trade kept.{}", ansi::yellow, ansi::reset);
+        return false;
+    }
+
+    repo.remove(id);
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} deleted.{}", ansi::green, id, ansi::reset);
+    return true;
+}
+
 bool cmd_list(const Repository& repo, std::string_view filter) {
     const auto& trades = repo.all();
     if (trades.empty()) {
@@ -607,6 +645,7 @@ void print_help() {
                  ansi::cyan, ansi::reset);
     std::println("                            Non-interactive add (see flags below)");
     std::println("  {}close <id>{}              Close an OPEN trade by id", ansi::cyan, ansi::reset);
+    std::println("  {}delete <id> [--yes]{}     Permanently delete a trade by id", ansi::cyan, ansi::reset);
     std::println("  {}list [open|closed|all]{}  List trades (default: open)", ansi::cyan, ansi::reset);
     std::println("  {}stats{}                   Show aggregate statistics", ansi::cyan, ansi::reset);
     std::println("  {}help{}                    Show this help", ansi::cyan, ansi::reset);
@@ -680,6 +719,28 @@ int run(int argc, char** argv) {
             return 2;
         }
         return cmd_close(repo, *id) ? 0 : 1;
+    }
+    if (cmd == "delete" || cmd == "rm") {
+        if (rest.size() < 2) {
+            std::println(stderr, "{}usage: delete <id> [--yes]{}", ansi::bright_red, ansi::reset);
+            return 2;
+        }
+        auto id = parse_id(rest[1]);
+        if (!id.has_value()) {
+            std::println(stderr, "{}invalid id: '{}'{}", ansi::bright_red, rest[1], ansi::reset);
+            return 2;
+        }
+        bool force = false;
+        for (std::size_t i = 2; i < rest.size(); ++i) {
+            if (rest[i] == "--yes" || rest[i] == "-y") {
+                force = true;
+            } else {
+                std::println(stderr, "{}unknown flag: '{}'{}", ansi::bright_red, rest[i],
+                             ansi::reset);
+                return 2;
+            }
+        }
+        return cmd_delete(repo, *id, force) ? 0 : 1;
     }
     if (cmd == "list") {
         std::string_view filter = (rest.size() > 1) ? rest[1] : std::string_view{"open"};

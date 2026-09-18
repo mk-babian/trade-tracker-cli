@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/trade-tracker.dir/link.d "CMakeFiles/trade-tracker.dir/src/main.cpp.o" "CMakeFiles/trade-tracker.dir/src/cli/cli.cpp.o" "CMakeFiles/trade-tracker.dir/src/model/trade.cpp.o" "CMakeFiles/trade-tracker.dir/src/model/json.cpp.o" "CMakeFiles/trade-tracker.dir/src/storage/repository.cpp.o" -o trade-tracker
