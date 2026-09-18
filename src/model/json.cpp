@@ -173,11 +173,56 @@ void dump_into(const Value& v, std::string& out) {
     }
 }
 
+void dump_pretty_into(const Value& v, std::string& out, int indent_width, int depth) {
+    auto indent = [&](int d) { out.append(static_cast<std::size_t>(d) * indent_width, ' '); };
+    switch (v.type()) {
+        case Value::Type::Array: {
+            const auto& a = v.as_array();
+            if (a.empty()) { out += "[]"; break; }
+            out += "[\n";
+            for (std::size_t i = 0; i < a.size(); ++i) {
+                indent(depth + 1);
+                dump_pretty_into(a[i], out, indent_width, depth + 1);
+                if (i + 1 != a.size()) out.push_back(',');
+                out.push_back('\n');
+            }
+            indent(depth);
+            out.push_back(']');
+            break;
+        }
+        case Value::Type::Object: {
+            const auto& o = v.as_object();
+            if (o.empty()) { out += "{}"; break; }
+            out += "{\n";
+            std::size_t i = 0;
+            for (const auto& [key, val] : o) {
+                indent(depth + 1);
+                out += escape_string(key);
+                out += ": ";
+                dump_pretty_into(val, out, indent_width, depth + 1);
+                if (++i != o.size()) out.push_back(',');
+                out.push_back('\n');
+            }
+            indent(depth);
+            out.push_back('}');
+            break;
+        }
+        default:
+            dump_into(v, out);  // scalars: identical to compact form
+    }
+}
+
 }  // namespace
 
 std::string dump(const Value& v) {
     std::string out;
     dump_into(v, out);
+    return out;
+}
+
+std::string dump_pretty(const Value& v, int indent_width) {
+    std::string out;
+    dump_pretty_into(v, out, indent_width, 0);
     return out;
 }
 

@@ -61,6 +61,10 @@ bool parse_status(std::string_view s, TradeStatus& out) {
         out = TradeStatus::Cancelled;
         return true;
     }
+    if (s == "EXPIRED") {
+        out = TradeStatus::Expired;
+        return true;
+    }
     return false;
 }
 
@@ -160,7 +164,7 @@ bool Repository::save(std::string& error) const {
     for (const auto& t : trades_) {
         arr.push_back(json::Value{trade_to_json(t)});
     }
-    const std::string text = json::dump(json::Value{std::move(arr)});
+    const std::string text = json::dump_pretty(json::Value{std::move(arr)});
 
     // Atomic write: serialize to a temp file, then rename over the target so a
     // crash mid-write never leaves a truncated journal.

@@ -73,10 +73,18 @@ g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
 # Close an open trade
 ./trade-tracker close 1
 
+# Mark an open trade as expired (entry price never hit within the timeframe)
+./trade-tracker expire 1
+
+# Delete a trade (prompts for confirmation)
+./trade-tracker delete 1
+./trade-tracker delete 1 --yes   # skip confirmation
+
 # List
 ./trade-tracker list            # open trades (default)
 ./trade-tracker list all
 ./trade-tracker list closed
+./trade-tracker list expired
 
 # Aggregate stats
 ./trade-tracker stats
@@ -218,6 +226,11 @@ add_executable(trade-tracker
 )
 
 target_include_directories(trade-tracker PRIVATE src)
+
+if(MINGW)
+    target_link_libraries(trade-tracker PRIVATE stdc++exp)
+    target_link_options(trade-tracker PRIVATE -static -static-libgcc -static-libstdc++)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(trade-tracker PRIVATE -Wall -Wextra -Wpedantic)
@@ -671,6 +684,82 @@ bool cmd_close(Repository& repo, std::uint64_t id) {
     return true;
 }
 
+bool cmd_expire(Repository& repo, std::uint64_t id) {
+    Trade* t = repo.find(id);
+    if (t == nullptr) {
+        std::println(stderr, "{}No trade with id {}.{}", ansi::bright_red, id, ansi::reset);
+        return false;
+    }
+    if (t->status != TradeStatus::Open) {
+        std::println(stderr, "{}Trade {} is not OPEN (status: {}).{}", ansi::bright_red, id,
+                     tt::to_string(t->status), ansi::reset);
+        return false;
+    }
+
+    std::println("{}Expiring trade #{} ({} @ {}){}", ansi::bold, id, tt::to_string(t->type),
+                 format_price(t->entry_price), ansi::reset);
+
+    std::string notes;
+    auto nv = prompt("Reason (optional, e.g. entry never hit):");
+    if (nv.has_value()) {
+        notes = *nv;
+    }
+
+    Trade updated = *t;
+    updated.exit_notes = notes;
+    updated.exit_time = time_utils::now();
+    updated.status = TradeStatus::Expired;
+
+    repo.update(updated);
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} expired (entry price not hit).{}", ansi::green, id, ansi::reset);
+    return true;
+}
+
+bool cmd_delete(Repository& repo, std::uint64_t id, bool force) {
+    const Trade* t = repo.find(id);
+    if (t == nullptr) {
+        std::println(stderr, "{}No trade with id {}.{}", ansi::bright_red, id, ansi::reset);
+        return false;
+    }
+
+    // Show what is about to be deleted before asking for confirmation.
+    std::println("");
+    std::println("{}â”€â”€ Delete Trade #{} â”€â”€{}", ansi::bold, id, ansi::reset);
+    std::println("  Direction : {}", tt::to_string(t->type));
+    std::println("  Status    : {}", tt::to_string(t->status));
+    std::println("  Entry     : {}", format_price(t->entry_price));
+    std::println("  Stop loss : {}", format_price(t->stop_loss));
+    std::println("  Take prof : {}", format_price(t->take_profit));
+    if (!t->description.empty()) {
+        std::println("  Notes     : {}", t->description);
+    }
+    std::println("");
+
+    const bool confirmed = force || prompt_yes_no("Delete this trade?");
+    if (!confirmed) {
+        std::println("{}Trade kept.{}", ansi::yellow, ansi::reset);
+        return false;
+    }
+
+    repo.remove(id);
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} deleted.{}", ansi::green, id, ansi::reset);
+    return true;
+}
+
 bool cmd_list(const Repository& repo, std::string_view filter) {
     const auto& trades = repo.all();
     if (trades.empty()) {
@@ -684,6 +773,9 @@ bool cmd_list(const Repository& repo, std::string_view filter) {
         }
         if (filter == "closed") {
             return t.status == TradeStatus::Closed;
+        }
+        if (filter == "expired") {
+            return t.status == TradeStatus::Expired;
         }
         // default: open
         return t.status == TradeStatus::Open;
@@ -758,6 +850,7 @@ bool cmd_stats(const Repository& repo) {
     std::size_t open = 0;
     std::size_t closed = 0;
     std::size_t cancelled = 0;
+    std::size_t expired = 0;
     std::size_t wins = 0;
     std::size_t losses = 0;
     std::size_t breakeven = 0;
@@ -776,6 +869,9 @@ bool cmd_stats(const Repository& repo) {
                 break;
             case TradeStatus::Cancelled:
                 ++cancelled;
+                break;
+            case TradeStatus::Expired:
+                ++expired;
                 break;
         }
 
@@ -820,6 +916,7 @@ bool cmd_stats(const Repository& repo) {
     std::println("  Open            : {}", open);
     std::println("  Closed          : {}", closed);
     std::println("  Cancelled       : {}", cancelled);
+    std::println("  Expired         : {}", expired);
     std::println("  Wins            : {}{}{}", ansi::bright_green, wins, ansi::reset);
     std::println("  Losses          : {}{}{}", ansi::bright_red, losses, ansi::reset);
     std::println("  Breakeven       : {}", breakeven);
@@ -848,7 +945,11 @@ void print_help() {
                  ansi::cyan, ansi::reset);
     std::println("                            Non-interactive add (see flags below)");
     std::println("  {}close <id>{}              Close an OPEN trade by id", ansi::cyan, ansi::reset);
-    std::println("  {}list [open|closed|all]{}  List trades (default: open)", ansi::cyan, ansi::reset);
+    std::println("  {}expire <id>{}             Mark an OPEN trade as expired (entry price not hit)",
+                 ansi::cyan, ansi::reset);
+    std::println("  {}delete <id> [--yes]{}     Permanently delete a trade by id", ansi::cyan, ansi::reset);
+    std::println("  {}list [open|closed|expired|all]{}  List trades (default: open)", ansi::cyan,
+                 ansi::reset);
     std::println("  {}stats{}                   Show aggregate statistics", ansi::cyan, ansi::reset);
     std::println("  {}help{}                    Show this help", ansi::cyan, ansi::reset);
     std::println("");
@@ -922,10 +1023,44 @@ int run(int argc, char** argv) {
         }
         return cmd_close(repo, *id) ? 0 : 1;
     }
+    if (cmd == "expire") {
+        if (rest.size() < 2) {
+            std::println(stderr, "{}usage: expire <id>{}", ansi::bright_red, ansi::reset);
+            return 2;
+        }
+        auto id = parse_id(rest[1]);
+        if (!id.has_value()) {
+            std::println(stderr, "{}invalid id: '{}'{}", ansi::bright_red, rest[1], ansi::reset);
+            return 2;
+        }
+        return cmd_expire(repo, *id) ? 0 : 1;
+    }
+    if (cmd == "delete" || cmd == "rm") {
+        if (rest.size() < 2) {
+            std::println(stderr, "{}usage: delete <id> [--yes]{}", ansi::bright_red, ansi::reset);
+            return 2;
+        }
+        auto id = parse_id(rest[1]);
+        if (!id.has_value()) {
+            std::println(stderr, "{}invalid id: '{}'{}", ansi::bright_red, rest[1], ansi::reset);
+            return 2;
+        }
+        bool force = false;
+        for (std::size_t i = 2; i < rest.size(); ++i) {
+            if (rest[i] == "--yes" || rest[i] == "-y") {
+                force = true;
+            } else {
+                std::println(stderr, "{}unknown flag: '{}'{}", ansi::bright_red, rest[i],
+                             ansi::reset);
+                return 2;
+            }
+        }
+        return cmd_delete(repo, *id, force) ? 0 : 1;
+    }
     if (cmd == "list") {
         std::string_view filter = (rest.size() > 1) ? rest[1] : std::string_view{"open"};
-        if (filter != "open" && filter != "closed" && filter != "all") {
-            std::println(stderr, "{}invalid filter: '{}' (expected open|closed|all){}",
+        if (filter != "open" && filter != "closed" && filter != "expired" && filter != "all") {
+            std::println(stderr, "{}invalid filter: '{}' (expected open|closed|expired|all){}",
                          ansi::bright_red, filter, ansi::reset);
             return 2;
         }
@@ -966,6 +1101,8 @@ int run(int argc, char** argv);
 // Individual commands. Each returns true on success.
 bool cmd_add(Repository& repo, const std::vector<std::string_view>& args);
 bool cmd_close(Repository& repo, std::uint64_t id);
+bool cmd_expire(Repository& repo, std::uint64_t id);
+bool cmd_delete(Repository& repo, std::uint64_t id, bool force);
 bool cmd_list(const Repository& repo, std::string_view filter);
 bool cmd_stats(const Repository& repo);
 
@@ -1558,6 +1695,8 @@ std::string_view to_string(TradeStatus s) noexcept {
             return "CLOSED";
         case TradeStatus::Cancelled:
             return "CANCELLED";
+        case TradeStatus::Expired:
+            return "EXPIRED";
     }
     return "UNKNOWN";
 }
@@ -1680,7 +1819,7 @@ FILE: src/model/trade.hpp
 namespace tt {
 
 enum class TradeType { Long, Short };
-enum class TradeStatus { Open, Closed, Cancelled };
+enum class TradeStatus { Open, Closed, Cancelled, Expired };
 enum class Outcome { Win, Loss, Breakeven, Undefined };
 
 std::string_view to_string(TradeType t) noexcept;
@@ -1804,6 +1943,10 @@ bool parse_status(std::string_view s, TradeStatus& out) {
     }
     if (s == "CANCELLED") {
         out = TradeStatus::Cancelled;
+        return true;
+    }
+    if (s == "EXPIRED") {
+        out = TradeStatus::Expired;
         return true;
     }
     return false;
@@ -1980,6 +2123,16 @@ bool Repository::update(const Trade& trade) noexcept {
     return false;
 }
 
+bool Repository::remove(std::uint64_t id) noexcept {
+    for (auto it = trades_.begin(); it != trades_.end(); ++it) {
+        if (it->id == id) {
+            trades_.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace tt
 
 
@@ -2028,6 +2181,9 @@ public:
 
     // Replace an existing trade by id; returns false if not found.
     bool update(const Trade& trade) noexcept;
+
+    // Remove a trade by id; returns false if not found.
+    bool remove(std::uint64_t id) noexcept;
 
     const std::filesystem::path& path() const noexcept { return path_; }
 

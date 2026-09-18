@@ -48,6 +48,9 @@ g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
 # Close an open trade
 ./trade-tracker close 1
 
+# Mark an open trade as expired (entry price never hit within the timeframe)
+./trade-tracker expire 1
+
 # Delete a trade (prompts for confirmation)
 ./trade-tracker delete 1
 ./trade-tracker delete 1 --yes   # skip confirmation
@@ -56,6 +59,7 @@ g++ -std=c++23 -O2 -Wall -Wextra -Wpedantic \
 ./trade-tracker list            # open trades (default)
 ./trade-tracker list all
 ./trade-tracker list closed
+./trade-tracker list expired
 
 # Aggregate stats
 ./trade-tracker stats

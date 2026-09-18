@@ -22,6 +22,8 @@ std::string_view to_string(TradeStatus s) noexcept {
             return "CLOSED";
         case TradeStatus::Cancelled:
             return "CANCELLED";
+        case TradeStatus::Expired:
+            return "EXPIRED";
     }
     return "UNKNOWN";
 }

@@ -15,6 +15,7 @@ add_executable(trade-tracker
     src/model/trade.cpp
     src/model/json.cpp
     src/storage/repository.cpp
+    src/storage/journal.cpp
 )
 
 target_include_directories(trade-tracker PRIVATE src)

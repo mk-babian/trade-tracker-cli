@@ -72,4 +72,11 @@ std::string dump(const Value& v);
 // Value (does not throw).
 Value parse(std::string_view text, std::string& error);
 
+// Serialize a Value into compact JSON text.
+std::string dump(const Value& v);
+
+// Serialize a Value into indented, multi-line JSON text.
+std::string dump_pretty(const Value& v, int indent_width = 2);
+
 }  // namespace tt::json
+

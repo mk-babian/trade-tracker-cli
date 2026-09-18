@@ -9,7 +9,7 @@
 namespace tt {
 
 enum class TradeType { Long, Short };
-enum class TradeStatus { Open, Closed, Cancelled };
+enum class TradeStatus { Open, Closed, Cancelled, Expired };
 enum class Outcome { Win, Loss, Breakeven, Undefined };
 
 std::string_view to_string(TradeType t) noexcept;

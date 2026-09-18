@@ -3,6 +3,7 @@
 #include "model/trade.hpp"
 #include "util/ansi.hpp"
 #include "util/time_utils.hpp"
+#include "storage/journal.hpp"
 
 #include <charconv>
 #include <cctype>
@@ -21,11 +22,42 @@ namespace tt::cli {
 
 namespace {
 
+bool cmd_journal(const std::vector<std::string_view>& args, const std::filesystem::path& path) {
+    std::string text;
+    if (!args.empty()) {
+        for (std::size_t i = 0; i < args.size(); ++i) {
+            if (i) text.push_back(' ');
+            text += args[i];
+        }
+    } else {
+        auto raw = prompt("Entry:");
+        if (!raw.has_value() || raw->empty()) {
+            std::println(stderr, "{}aborted (empty entry){}", ansi::bright_yellow, ansi::reset);
+            return false;
+        }
+        text = *raw;
+    }
+    std::string err;
+    if (!append_journal_entry(path, text, err)) {
+        std::println(stderr, "{}error: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+    std::println("{}logged to {}{}", ansi::green, path.string(), ansi::reset);
+    return true;
+}
+
 std::filesystem::path default_data_file() {
     if (const char* env = std::getenv("TT_DATA_FILE"); env != nullptr && *env != '\0') {
         return std::filesystem::path(env);
     }
     return std::filesystem::path("trades.json");
+}
+
+std::filesystem::path default_journal_file() {
+    if (const char* env = std::getenv("TT_JOURNAL_FILE"); env != nullptr && *env != '\0') {
+        return std::filesystem::path(env);
+    }
+    return std::filesystem::path("journal.log");
 }
 
 std::string trim(std::string s) {
@@ -430,6 +462,44 @@ bool cmd_close(Repository& repo, std::uint64_t id) {
     return true;
 }
 
+bool cmd_expire(Repository& repo, std::uint64_t id) {
+    Trade* t = repo.find(id);
+    if (t == nullptr) {
+        std::println(stderr, "{}No trade with id {}.{}", ansi::bright_red, id, ansi::reset);
+        return false;
+    }
+    if (t->status != TradeStatus::Open) {
+        std::println(stderr, "{}Trade {} is not OPEN (status: {}).{}", ansi::bright_red, id,
+                     tt::to_string(t->status), ansi::reset);
+        return false;
+    }
+
+    std::println("{}Expiring trade #{} ({} @ {}){}", ansi::bold, id, tt::to_string(t->type),
+                 format_price(t->entry_price), ansi::reset);
+
+    std::string notes;
+    auto nv = prompt("Reason (optional, e.g. entry never hit):");
+    if (nv.has_value()) {
+        notes = *nv;
+    }
+
+    Trade updated = *t;
+    updated.exit_notes = notes;
+    updated.exit_time = time_utils::now();
+    updated.status = TradeStatus::Expired;
+
+    repo.update(updated);
+
+    std::string err;
+    if (!repo.save(err)) {
+        std::println(stderr, "{}error: failed to save: {}{}", ansi::bright_red, err, ansi::reset);
+        return false;
+    }
+
+    std::println("{}Trade #{} expired (entry price not hit).{}", ansi::green, id, ansi::reset);
+    return true;
+}
+
 bool cmd_delete(Repository& repo, std::uint64_t id, bool force) {
     const Trade* t = repo.find(id);
     if (t == nullptr) {
@@ -481,6 +551,9 @@ bool cmd_list(const Repository& repo, std::string_view filter) {
         }
         if (filter == "closed") {
             return t.status == TradeStatus::Closed;
+        }
+        if (filter == "expired") {
+            return t.status == TradeStatus::Expired;
         }
         // default: open
         return t.status == TradeStatus::Open;
@@ -555,6 +628,7 @@ bool cmd_stats(const Repository& repo) {
     std::size_t open = 0;
     std::size_t closed = 0;
     std::size_t cancelled = 0;
+    std::size_t expired = 0;
     std::size_t wins = 0;
     std::size_t losses = 0;
     std::size_t breakeven = 0;
@@ -573,6 +647,9 @@ bool cmd_stats(const Repository& repo) {
                 break;
             case TradeStatus::Cancelled:
                 ++cancelled;
+                break;
+            case TradeStatus::Expired:
+                ++expired;
                 break;
         }
 
@@ -617,6 +694,7 @@ bool cmd_stats(const Repository& repo) {
     std::println("  Open            : {}", open);
     std::println("  Closed          : {}", closed);
     std::println("  Cancelled       : {}", cancelled);
+    std::println("  Expired         : {}", expired);
     std::println("  Wins            : {}{}{}", ansi::bright_green, wins, ansi::reset);
     std::println("  Losses          : {}{}{}", ansi::bright_red, losses, ansi::reset);
     std::println("  Breakeven       : {}", breakeven);
@@ -645,9 +723,13 @@ void print_help() {
                  ansi::cyan, ansi::reset);
     std::println("                            Non-interactive add (see flags below)");
     std::println("  {}close <id>{}              Close an OPEN trade by id", ansi::cyan, ansi::reset);
+    std::println("  {}expire <id>{}             Mark an OPEN trade as expired (entry price not hit)",
+                 ansi::cyan, ansi::reset);
     std::println("  {}delete <id> [--yes]{}     Permanently delete a trade by id", ansi::cyan, ansi::reset);
-    std::println("  {}list [open|closed|all]{}  List trades (default: open)", ansi::cyan, ansi::reset);
+    std::println("  {}list [open|closed|expired|all]{}  List trades (default: open)", ansi::cyan,
+                 ansi::reset);
     std::println("  {}stats{}                   Show aggregate statistics", ansi::cyan, ansi::reset);
+    std::println("  {}journal [text]{}          Append a timestamped note (prompts if omitted)", ansi::cyan, ansi::reset);
     std::println("  {}help{}                    Show this help", ansi::cyan, ansi::reset);
     std::println("");
     std::println("{}Add flags:{}", ansi::bold, ansi::reset);
@@ -696,6 +778,11 @@ int run(int argc, char** argv) {
         return 0;
     }
 
+    if (cmd == "journal" || cmd == "log") {
+        std::vector<std::string_view> journal_args(rest.begin() + 1, rest.end());
+        return cmd_journal(journal_args, default_journal_file()) ? 0 : 1;
+    }
+
     Repository repo(data_file);
     std::string err;
     if (!repo.load(err)) {
@@ -719,6 +806,18 @@ int run(int argc, char** argv) {
             return 2;
         }
         return cmd_close(repo, *id) ? 0 : 1;
+    }
+    if (cmd == "expire") {
+        if (rest.size() < 2) {
+            std::println(stderr, "{}usage: expire <id>{}", ansi::bright_red, ansi::reset);
+            return 2;
+        }
+        auto id = parse_id(rest[1]);
+        if (!id.has_value()) {
+            std::println(stderr, "{}invalid id: '{}'{}", ansi::bright_red, rest[1], ansi::reset);
+            return 2;
+        }
+        return cmd_expire(repo, *id) ? 0 : 1;
     }
     if (cmd == "delete" || cmd == "rm") {
         if (rest.size() < 2) {
@@ -744,8 +843,8 @@ int run(int argc, char** argv) {
     }
     if (cmd == "list") {
         std::string_view filter = (rest.size() > 1) ? rest[1] : std::string_view{"open"};
-        if (filter != "open" && filter != "closed" && filter != "all") {
-            std::println(stderr, "{}invalid filter: '{}' (expected open|closed|all){}",
+        if (filter != "open" && filter != "closed" && filter != "expired" && filter != "all") {
+            std::println(stderr, "{}invalid filter: '{}' (expected open|closed|expired|all){}",
                          ansi::bright_red, filter, ansi::reset);
             return 2;
         }
