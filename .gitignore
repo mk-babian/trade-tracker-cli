@@ -1,2 +1,5 @@
-build
-digest.txt
+build/
+
+*.txt
+journal.log
+trades.json
